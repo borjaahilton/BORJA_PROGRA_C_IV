@@ -1,0 +1,155 @@
+CREATE DATABASE IF NOT EXISTS Horarios_Marello;
+USE Horarios_Marello;
+
+CREATE TABLE `personas` (
+  `persona_id` BIGINT PRIMARY KEY AUTO_INCREMENT,
+  `tipo_documento` VARCHAR(20),
+  `numero_documento` VARCHAR(50),
+  `nombres` VARCHAR(200),
+  `apellidos` VARCHAR(200),
+  `fecha_nacimiento` DATE,
+  `email` VARCHAR(255),
+  `telefono` VARCHAR(50),
+  `direccion` TEXT,
+  `metadata` JSON,
+  `creado_en` DATETIME,
+  `actualizado_en` DATETIME
+);
+
+
+CREATE TABLE `usuarios` (
+  `usuario_id` BIGINT PRIMARY KEY AUTO_INCREMENT,
+  `persona_id` BIGINT,
+  `nombre_usuario` VARCHAR(100),
+  `email` VARCHAR(255),
+  `hashed_pass` TEXT,
+  `rol` VARCHAR(50),
+  `activo` BOOLEAN,
+  `ultimo_login` DATETIME,
+  `creado_en` DATETIME,
+  `actualizado_en` DATETIME
+);
+
+CREATE TABLE `especialidades` (
+  `especialidad_id` BIGINT PRIMARY KEY AUTO_INCREMENT,
+  `codigo` VARCHAR(50),
+  `nombre` VARCHAR(200),
+  `descripcion` TEXT,
+  `creado_en` DATETIME,
+  `actualizado_en` DATETIME
+);
+
+CREATE TABLE `ciclos` (
+  `ciclo_id` SMALLINT PRIMARY KEY,
+  `nombre` VARCHAR(20),
+  `descripcion` TEXT,
+  `orden` SMALLINT,
+  `creado_en` DATETIME,
+  `actualizado_en` DATETIME
+);
+
+CREATE TABLE `cursos` (
+  `curso_id` BIGINT PRIMARY KEY AUTO_INCREMENT,
+  `codigo` VARCHAR(50),
+  `nombre` VARCHAR(255),
+  `creditos` DECIMAL(4,2),
+  `horas` INT,
+  `descripcion` TEXT,
+  `creado_en` DATETIME,
+  `actualizado_en` DATETIME
+);
+
+CREATE TABLE `aulas` (
+  `aula_id` BIGINT PRIMARY KEY AUTO_INCREMENT,
+  `codigo` VARCHAR(50),
+  `nombre` VARCHAR(200),
+  `capacidad` INT,
+  `ubicacion` TEXT,
+  `recurso_tipo` VARCHAR(50),
+  `creado_en` DATETIME,
+  `actualizado_en` DATETIME
+);
+
+CREATE TABLE `docentes` (
+  `docente_id` BIGINT PRIMARY KEY AUTO_INCREMENT,
+  `persona_id` BIGINT,
+  `codigo_docente` VARCHAR(50),
+  `activo` BOOLEAN,
+  `especialidad_id` BIGINT,
+  `observaciones` TEXT,
+  `creado_en` DATETIME,
+  `actualizado_en` DATETIME
+);
+
+CREATE TABLE `horarios_base` (
+  `horario_id` BIGINT PRIMARY KEY AUTO_INCREMENT,
+  `dia_semana` TINYINT,
+  `hora_inicio` TIME,
+  `hora_fin` TIME,
+  `descripcion` TEXT,
+  `creado_en` DATETIME,
+  `actualizado_en` DATETIME
+);
+
+CREATE TABLE `semanas` (
+  `semana_id` SMALLINT PRIMARY KEY,
+  `fecha_inicio` DATE,
+  `fecha_fin` DATE,
+  `descripcion` TEXT
+);
+
+CREATE TABLE `estructura_curricular` (
+  `estructura_id` BIGINT PRIMARY KEY AUTO_INCREMENT,
+  `especialidad_id` BIGINT,
+  `ciclo_id` SMALLINT,
+  `curso_id` BIGINT,
+  `obligatorio` BOOLEAN,
+  `semestre` SMALLINT,
+  `creditos` DECIMAL(4,2),
+  `creado_en` DATETIME,
+  `actualizado_en` DATETIME
+);
+
+CREATE TABLE `asignaciones_semanales` (
+  `asignacion_id` BIGINT PRIMARY KEY AUTO_INCREMENT,
+  `docente_id` BIGINT,
+  `curso_id` BIGINT,
+  `aula_id` BIGINT,
+  `horario_id` BIGINT,
+  `semana_id` SMALLINT,
+  `ciclo_id` SMALLINT,
+  `especialidad_id` BIGINT,
+  `tipo_sesion` VARCHAR(50),
+  `creado_por` BIGINT,
+  `activo` BOOLEAN,
+  `creado_en` DATETIME,
+  `actualizado_en` DATETIME
+);
+
+ALTER TABLE `usuarios` ADD FOREIGN KEY (`persona_id`) REFERENCES `personas` (`persona_id`);
+
+ALTER TABLE `docentes` ADD FOREIGN KEY (`persona_id`) REFERENCES `personas` (`persona_id`);
+
+ALTER TABLE `docentes` ADD FOREIGN KEY (`especialidad_id`) REFERENCES `especialidades` (`especialidad_id`);
+
+ALTER TABLE `estructura_curricular` ADD FOREIGN KEY (`especialidad_id`) REFERENCES `especialidades` (`especialidad_id`);
+
+ALTER TABLE `estructura_curricular` ADD FOREIGN KEY (`ciclo_id`) REFERENCES `ciclos` (`ciclo_id`);
+
+ALTER TABLE `estructura_curricular` ADD FOREIGN KEY (`curso_id`) REFERENCES `cursos` (`curso_id`);
+
+ALTER TABLE `asignaciones_semanales` ADD FOREIGN KEY (`docente_id`) REFERENCES `docentes` (`docente_id`);
+
+ALTER TABLE `asignaciones_semanales` ADD FOREIGN KEY (`curso_id`) REFERENCES `cursos` (`curso_id`);
+
+ALTER TABLE `asignaciones_semanales` ADD FOREIGN KEY (`aula_id`) REFERENCES `aulas` (`aula_id`);
+
+ALTER TABLE `asignaciones_semanales` ADD FOREIGN KEY (`horario_id`) REFERENCES `horarios_base` (`horario_id`);
+
+ALTER TABLE `asignaciones_semanales` ADD FOREIGN KEY (`semana_id`) REFERENCES `semanas` (`semana_id`);
+
+ALTER TABLE `asignaciones_semanales` ADD FOREIGN KEY (`ciclo_id`) REFERENCES `ciclos` (`ciclo_id`);
+
+ALTER TABLE `asignaciones_semanales` ADD FOREIGN KEY (`especialidad_id`) REFERENCES `especialidades` (`especialidad_id`);
+
+ALTER TABLE `asignaciones_semanales` ADD FOREIGN KEY (`creado_por`) REFERENCES `usuarios` (`usuario_id`);
