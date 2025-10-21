@@ -149,6 +149,49 @@ class ConexionDB:
             cursor.close()
             self.cerrar(conexion)
 
+    def _find_person_table_and_id(self, conexion):
+        """Detecta si la tabla de personas se llama 'persona' o 'personas' y si la PK es 'id' o 'persona_id'.
+        Devuelve una tupla (tabla, columna_id) o (None, None) si no se encuentra.
+        """
+        try:
+            cursor = conexion.cursor()
+            # Consultar INFORMATION_SCHEMA para comprobar existencia de tablas y columnas
+            query = (
+                "SELECT TABLE_NAME, COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS "
+                "WHERE TABLE_SCHEMA = %s AND TABLE_NAME IN ('persona','personas')"
+            )
+            cursor.execute(query, (self.database,))
+            rows = cursor.fetchall()
+
+            # Construir mapa table -> list of column names (original case)
+            cols_by_table = {}
+            for r in rows:
+                tbl = r[0]
+                col = r[1]
+                cols_by_table.setdefault(tbl, []).append(col)
+                try:
+                    print(f"[DEBUG] _find_person_table_and_id cols_by_table={cols_by_table}")
+                except Exception:
+                    pass
+
+            # Lista de candidatos (en orden de preferencia), comparar en minúsculas
+            candidates = ['id', 'persona_id', 'personaid', 'personaid']
+
+            # Prioridad por tabla y por candidato
+            for tbl in ['persona', 'personas']:
+                cols = cols_by_table.get(tbl, [])
+                cols_lower_map = {c.lower(): c for c in cols}
+                for cand in candidates:
+                    if cand in cols_lower_map:
+                        return tbl, cols_lower_map[cand]
+
+            return None, None
+        except Exception:
+            return None, None
+        finally:
+            if 'cursor' in locals():
+                cursor.close()
+
     def actualizar_persona(self, persona_id, campos: dict):
         """Actualiza campos de una persona dado su id. campos es un dict columna->valor."""
         if not campos:
@@ -164,11 +207,24 @@ class ConexionDB:
             for k, v in campos.items():
                 columnas.append(f"{k} = %s")
                 valores.append(v)
+            # Determinar tabla y columna id correcta
+            table, id_col = self._find_person_table_and_id(conexion)
+            if not table or not id_col:
+                return {"status": False, "mensaje": "No se pudo detectar la tabla/columna de personas en la base de datos"}
             valores.append(persona_id)
-            sql = f"UPDATE persona SET {', '.join(columnas)} WHERE id = %s"
+            sql = f"UPDATE {table} SET {', '.join(columnas)} WHERE {id_col} = %s"
+            # Debug: imprimir SQL y parámetros
+            try:
+                print(f"[SQL DEBUG] actualizar_persona -> table={table}, id_col={id_col}, sql={sql}, params={tuple(valores)}")
+            except Exception:
+                pass
             cursor.execute(sql, tuple(valores))
             conexion.commit()
-            return {"status": True, "mensaje": "Registro actualizado"}
+            # Informar si no se afectó ninguna fila (id inexistente quizá)
+            rows = cursor.rowcount if hasattr(cursor, 'rowcount') else None
+            if rows == 0:
+                return {"status": False, "mensaje": f"No se actualizó ninguna fila (id={persona_id}). SQL: {sql}", "rows_affected": 0}
+            return {"status": True, "mensaje": "Registro actualizado", "rows_affected": rows}
         except Error as e:
             return {"status": False, "mensaje": str(e)}
         finally:
@@ -183,9 +239,20 @@ class ConexionDB:
             return {"status": False, "mensaje": "Error al conectar con la base de datos"}
         try:
             cursor = conexion.cursor()
-            cursor.execute("DELETE FROM persona WHERE id = %s", (persona_id,))
+            table, id_col = self._find_person_table_and_id(conexion)
+            if not table or not id_col:
+                return {"status": False, "mensaje": "No se pudo detectar la tabla/columna de personas en la base de datos"}
+            sql = f"DELETE FROM {table} WHERE {id_col} = %s"
+            try:
+                print(f"[SQL DEBUG] eliminar_persona -> table={table}, id_col={id_col}, sql={sql}, params={(persona_id,)}")
+            except Exception:
+                pass
+            cursor.execute(sql, (persona_id,))
             conexion.commit()
-            return {"status": True, "mensaje": "Registro eliminado"}
+            rows = cursor.rowcount if hasattr(cursor, 'rowcount') else None
+            if rows == 0:
+                return {"status": False, "mensaje": f"No se eliminó ninguna fila (id={persona_id}). SQL: {sql}", "rows_affected": 0}
+            return {"status": True, "mensaje": "Registro eliminado", "rows_affected": rows}
         except Error as e:
             return {"status": False, "mensaje": str(e)}
         finally:

@@ -50,7 +50,8 @@ class PersonasView(ft.Container):
             dni = f.get('dni') or f.get('DNI') or ''
             telefono = f.get('telefono') or f.get('celular') or ''
 
-            btn_editar = ft.IconButton(ft.Icons.EDIT, tooltip="Editar", on_click=lambda e, pid=pid, row=f: self.abrir_editar(pid, row))
+            # Botones con icono (mejor estilo)
+            btn_editar = ft.IconButton(ft.Icons.EDIT, tooltip="Editar", on_click=lambda e, pid=pid: self.mostrar_formulario_editar(pid))
             btn_borrar = ft.IconButton(ft.Icons.DELETE, tooltip="Eliminar", on_click=lambda e, pid=pid: self.confirmar_borrar(pid))
 
             acciones = ft.Row([btn_editar, btn_borrar])
@@ -68,57 +69,46 @@ class PersonasView(ft.Container):
         # No llamar a self.update() aquí (evita AssertionError si el control aún no tiene UID)
         self.page.update()
 
-    def abrir_editar(self, pid, fila):
-        # Dialogo para editar
-        nombre = fila.get('nombres') or fila.get('nombre') or ''
-        apellido = fila.get('apellidos') or fila.get('apellido') or ''
-        dni = fila.get('dni') or fila.get('DNI') or ''
-        telefono = fila.get('telefono') or fila.get('celular') or ''
+    def mostrar_formulario_editar(self, persona_id):
+        # Navegar a la vista de edición (archivo acciones/editar_persona_view.py)
+        from acciones.editar_persona_view import EditarPersonaView
 
-        txt_nombre = ft.TextField(label="Nombres", value=nombre)
-        txt_apellido = ft.TextField(label="Apellidos", value=apellido)
-        txt_dni = ft.TextField(label="DNI", value=str(dni))
-        txt_tel = ft.TextField(label="Teléfono", value=str(telefono))
+        # Definir una función 'volver' que recrea la vista de Personas y recarga los datos.
+        def volver_a_personas():
+            # Crear una nueva instancia de PersonasView para garantizar estado limpio
+            nueva_vista = PersonasView(self.page, self.cambiar_vista)
+            # Cambiar a la nueva vista y forzar carga de datos
+            self.cambiar_vista(nueva_vista)
+            try:
+                nueva_vista.cargar_personas()
+            except Exception:
+                # Si algo falla, actualizamos la página para evitar estados inconsistentes
+                self.page.update()
 
-        def guardar(e):
-            campos = {
-                'nombres': txt_nombre.value.strip(),
-                'apellidos': txt_apellido.value.strip(),
-                'dni': txt_dni.value.strip(),
-                'telefono': txt_tel.value.strip()
-            }
-            res = self.db.actualizar_persona(pid, campos)
-            self.page.dialog.open = False
-            self.page.update()
-            if res.get('status'):
-                self.cargar_personas()
-            else:
-                self.page.snack_bar = ft.SnackBar(ft.Text(f"Error: {res.get('mensaje')}"))
-                self.page.snack_bar.open = True
-            self.page.update()
-
-        dlg = ft.AlertDialog(
-            title=ft.Text("Editar Persona"),
-            content=ft.Column([txt_nombre, txt_apellido, txt_dni, txt_tel]),
-            actions=[
-                ft.TextButton("Cancelar", on_click=lambda e: self._cerrar_dialogo()),
-                ft.ElevatedButton("Guardar", on_click=guardar)
-            ],
-            actions_alignment=ft.MainAxisAlignment.END
-        )
-        self.page.dialog = dlg
-        dlg.open = True
-        self.page.update()
+        editar_vista = EditarPersonaView(self.page, volver_a_personas, persona_id)
+        # Cambiar a la vista de edición
+        self.cambiar_vista(editar_vista)
 
     def confirmar_borrar(self, pid):
         def borrar(e):
-            res = self.db.eliminar_persona(pid)
-            self.page.dialog.open = False
-            self.page.update()
+            try:
+                pid_int = int(pid)
+            except Exception:
+                pid_int = pid
+            res = self.db.eliminar_persona(pid_int)
+            try:
+                print(f"[DEBUG] eliminar_persona id={pid} -> response: {res}")
+            except Exception:
+                pass
+            # Cerrar diálogo y notificar resultado
+            self._cerrar_dialogo()
             if res.get('status'):
+                self.page.snack_bar = ft.SnackBar(ft.Text("Registro eliminado"))
+                self.page.snack_bar.open = True
                 self.cargar_personas()
             else:
-                self.page.snack_bar = ft.SnackBar(ft.Text(f"Error: {res.get('mensaje')}"))
+                detalle = res.get('mensaje') or ''
+                self.page.snack_bar = ft.SnackBar(ft.Text(f"No se eliminó: {detalle}"))
                 self.page.snack_bar.open = True
             self.page.update()
 
@@ -127,7 +117,7 @@ class PersonasView(ft.Container):
             content=ft.Text("¿Desea eliminar este registro?"),
             actions=[
                 ft.TextButton("Cancelar", on_click=lambda e: self._cerrar_dialogo()),
-                ft.ElevatedButton("Eliminar", bgcolor=ft.colors.RED_ACCENT_100, on_click=borrar)
+                ft.ElevatedButton("Eliminar", bgcolor=ft.Colors.RED_ACCENT_100, on_click=borrar)
             ]
         )
         self.page.dialog = dlg
@@ -135,8 +125,13 @@ class PersonasView(ft.Container):
         self.page.update()
 
     def _cerrar_dialogo(self):
-        self.page.dialog.open = False
-        self.page.update()
+        try:
+            if hasattr(self.page, 'dialog') and self.page.dialog:
+                self.page.dialog.open = False
+                self.page.update()
+        except Exception:
+            # si algo falla al cerrar el diálogo, actualizamos la página de todos modos
+            self.page.update()
 
     def volver(self, e):
         from dashboard_view import DashboardView

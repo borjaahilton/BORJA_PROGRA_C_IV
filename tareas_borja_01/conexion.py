@@ -119,80 +119,33 @@ class ConexionDB:
         conexion = self.conectar()
         if not conexion:
             return {"status": False, "mensaje": "Error al conectar con la base de datos", "data": []}
-        cursor = conexion.cursor()
         try:
+            cursor = conexion.cursor()
             cursor.execute("SHOW COLUMNS FROM %s" % tabla_nombre)
             cols = [row[0] for row in cursor.fetchall()]
             return {"status": True, "mensaje": "Columnas obtenidas", "data": cols}
         except Error as e:
             return {"status": False, "mensaje": str(e), "data": []}
         finally:
-            cursor.close()
+            if 'cursor' in locals():
+                cursor.close()
             self.cerrar(conexion)
 
     def listar_personas(self):
-        """Devuelve todas las filas de la tabla persona."""
         conexion = self.conectar()
         if not conexion:
             return {"status": False, "mensaje": "Error al conectar con la base de datos", "data": []}
-        cursor = conexion.cursor(dictionary=True)
         try:
-            try:
-                cursor.execute("SELECT * FROM persona")
-            except Error:
-                cursor.execute("SELECT * FROM personas")
+            cursor = conexion.cursor(dictionary=True)
+            cursor.execute("SELECT * FROM personas")
             filas = cursor.fetchall()
-            return {"status": True, "mensaje": "Personas obtenidas", "data": filas}
+            return {"status": True, "mensaje": "Listado de personas obtenido", "data": filas}
         except Error as e:
-            return {"status": False, "mensaje": str(e), "data": []}
-        finally:
-            cursor.close()
-            self.cerrar(conexion)
-
-    def actualizar_persona(self, persona_id, campos: dict):
-        """Actualiza campos de una persona dado su id. campos es un dict columna->valor."""
-        if not campos:
-            return {"status": False, "mensaje": "No hay campos para actualizar"}
-        conexion = self.conectar()
-        if not conexion:
-            return {"status": False, "mensaje": "Error al conectar con la base de datos"}
-        try:
-            cursor = conexion.cursor()
-            # Construir SET dinámico
-            columnas = []
-            valores = []
-            for k, v in campos.items():
-                columnas.append(f"{k} = %s")
-                valores.append(v)
-            valores.append(persona_id)
-            sql = f"UPDATE persona SET {', '.join(columnas)} WHERE id = %s"
-            cursor.execute(sql, tuple(valores))
-            conexion.commit()
-            return {"status": True, "mensaje": "Registro actualizado"}
-        except Error as e:
-            return {"status": False, "mensaje": str(e)}
+            return {"status": False, "mensaje": f"Error en la consulta: {e}", "data": []}
         finally:
             if 'cursor' in locals():
                 cursor.close()
             self.cerrar(conexion)
-
-    def eliminar_persona(self, persona_id):
-        """Elimina una persona por id."""
-        conexion = self.conectar()
-        if not conexion:
-            return {"status": False, "mensaje": "Error al conectar con la base de datos"}
-        try:
-            cursor = conexion.cursor()
-            cursor.execute("DELETE FROM persona WHERE id = %s", (persona_id,))
-            conexion.commit()
-            return {"status": True, "mensaje": "Registro eliminado"}
-        except Error as e:
-            return {"status": False, "mensaje": str(e)}
-        finally:
-            if 'cursor' in locals():
-                cursor.close()
-            self.cerrar(conexion)
-            
 
     def listar_especialidades(self):
         conexion = self.conectar()
